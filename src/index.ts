@@ -14,7 +14,7 @@ addEventListener("fetch", (event) => event.respondWith(handleRequest(event)));
 
 async function handleRequest(event: FetchEvent) {
   // Get the client request.
-  let req = event.request;
+  const req = event.request;
 
   // Filter requests that have unexpected methods.
   if (!["HEAD", "GET", "PURGE"].includes(req.method)) {
@@ -23,14 +23,10 @@ async function handleRequest(event: FetchEvent) {
     });
   }
 
-  let url = new URL(req.url);
+  const url = new URL(req.url);
 
-  // If request is to the `/` path...
+  // If request is to the `/robots.txt` path...
   if (url.pathname == "/robots.txt") {
-    // Below are some common patterns for Fastly Compute services using JavaScript.
-    // Head to https://developer.fastly.com/learning/compute/javascript/ to discover more.
-
-    // Create a new request.
     const secretStore = new SecretStore("api-keys");
     const darkVisitorsApiKey = await secretStore.get("darkVisitorsApiKey");
     if (!darkVisitorsApiKey) {
@@ -39,7 +35,15 @@ async function handleRequest(event: FetchEvent) {
       });
     }
 
-    const bereq = new Request("https://api.darkvisitors.com/robots-txts", {
+    const mltshpRobotsTxtReq = new Request("https://mltshp.com/static/robots.txt", {
+      cacheKey: "mltshpRobotsTxt",
+    });
+    const mltshpRobotsTxtResp = await fetch(mltshpRobotsTxtReq, {
+      backend: "mltshp.com",
+    });
+    const mltshpRobotsTxtData = await mltshpRobotsTxtResp.text();
+
+    const darkVisitorsReq = new Request("https://api.darkvisitors.com/robots-txts", {
       body: JSON.stringify({
         agent_types: [
           "AI Data Scraper",
@@ -56,12 +60,19 @@ async function handleRequest(event: FetchEvent) {
     });
 
     // Forward the request to a backend.
-    const beresp = await fetch(bereq, {
+    const darkVisitorsResp = await fetch(darkVisitorsReq, {
       backend: "DarkVisitors API Endpoint",
     });
 
-    const data = await beresp.text();
-    return new Response(data, {
+    const darkVisitorsData = await darkVisitorsResp.text();
+
+    const robotsTxt = `${mltshpRobotsTxtData}
+
+### DarkVisitors
+
+${darkVisitorsData}
+`;
+    return new Response(robotsTxt, {
       status: 200,
       headers: {
         "Cache-Control": "s-maxage=3600, max-age=0",
